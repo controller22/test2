@@ -4,6 +4,16 @@
         <hr />
         <div id="user-box" class="user-box">
         </div>
+        </br> 
+
+        <div class="input-group" style="width: 30%; float: right;">
+                    <input type="text" class="form-control" id="search" placeholder="보낸 사람">
+                    <div class="input-group-append">
+                        <button type="button" id="searchButton" onclick="search()">검색</button>
+                    </div>
+                </div>
+ </br>
+ </br>
         <div class="list-box">
             <div style="display: flex; ">
                 <button id="all" style="margin-right: 20px;" onclick="getgubun('all')">전체</button>
@@ -12,13 +22,8 @@
                 <br />
             </div>
 
-
-
-            <div id="tes-box">
-
+            <div id="information-box">
             </div>
-
-
 
             <table class="table table-striped">
                 <thead>
@@ -41,10 +46,23 @@
                 <button id="next" type="button" class="btn btn-outline-primary" onclick="page('next')">next</button>
             </ul>
         </nav>
+
+
         <script>
         
             let localPage = 1;
             let gubun = "all";
+
+
+            $(document).ready(function() {
+                let accountId = $('#accountId').val();
+
+            // 계좌 정보 출력
+                getAccountData();
+
+            // 거래 내역 조회
+                getgubun('all');
+            });
 
          function getAccountData() {
             let id = $('#accountId').val();
@@ -62,25 +80,11 @@
                 </div>`;
                 $('#user-box').html(userBox);
                 console.log(data.data.lastpage);
-
-               
             })
             .fail(function (jqXHR, textStatus, errorThrown) {
                 console.error(textStatus + ' : ' + errorThrown);
             });
         }
-
-        $(document).ready(function() {
-        let accountId = $('#accountId').val();
-        
-        // 계좌 정보 출력
-        getAccountData();
-
-        // 거래 내역 조회
-        getgubun('all');
-        });
-
-
 
             function getgubun(selectedGubun) {
                 gubun = selectedGubun;
@@ -93,18 +97,12 @@
                     $('#account-data').empty();
 
                     let hdtoList = data.data.hdtoList;
-                    // let lastpage = data.data.lastpage;
                     
-                     let ta = data.data.lastpage;
-                    let ela = '<input type="text" id="lastpage" id="lastpage" value=' + ta + '>';
-                    $('#tes-box').empty();
-                    $('#tes-box').append(ela);
-                    $(document).ready(function() {
-                         $("#tes").val(data.data.lastpage);
-                    });
-                // $("#tes").val(data.data.lastpage);
-
-
+                    let lastpage = data.data.lastpage;
+                    let ela = '<input type="hidden" id="lastpage" id="lastpage" value=' + lastpage + '>';
+                    $('#information-box').empty();
+                    $('#information-box').append(ela);
+                   
 
                         for (let i = 0; i < hdtoList.length; i++) {
                             let el =
@@ -117,11 +115,7 @@
                                 </tr>`;
                             $('#account-data').append(el);
                         }
-                        // $('#lastpage').val($(data).find('#lastpage').val());
-                        // $('#lastpage').append($(data).find('#lastpage').html());
-
-                    // $('#lastpage').text(lastpage);
-                    
+                       
                     $('#previous').attr('disabled', 'disabled');
                     $('#next').removeAttr('disabled');
                     localPage = 1;
@@ -175,6 +169,48 @@
                     console.error(textStatus + ' : ' + errorThrown);
                 });
             }
+
+            function search() {
+                let data = {
+                    searchString: $("#search").val()
+                };
+                $.ajax({
+                    type: "post",
+                    url: `/api/account/${id}/search?page=` + localPage + "&gubun=" + gubun,
+                    contentType: "application/json;charset=UTF-8",
+                    data: JSON.stringify(data),
+                    dataType: "json"
+                })
+                    .done((data) => {
+                        let hdtoList = data.data.hdtoList;
+                        let lastpage = data.data.lastpage;
+
+                        console.log(data);
+                        $("#information-box").empty();
+
+                        for (let i = 0; i < hdtoList.length; i++) {
+                            let el =
+                                `<tr>
+                                <td>`+ hdtoList[i].createdAt + `</td>
+                                <td>`+ hdtoList[i].sender + `</td>
+                                <td>`+ hdtoList[i].receiver + `</td>
+                                <td>`+ hdtoList[i].amount + `원</td>
+                                <td>`+ hdtoList[i].balance + `원</td>
+                                </tr>`;
+                            $("#information-box").append(el);
+                        }
+                       
+                    $('#previous').attr('disabled', 'disabled');
+                    $('#next').removeAttr('disabled');
+                    localPage = 1;
+                })
+                .fail(function (jqXHR, textStatus, errorThrown) {
+                    console.error(textStatus + ' : ' + errorThrown);
+                });
+
+            }
+
+
 
         </script>
 

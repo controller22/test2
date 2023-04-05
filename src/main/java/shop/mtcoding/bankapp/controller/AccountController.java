@@ -12,6 +12,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -24,6 +25,7 @@ import shop.mtcoding.bankapp.dto.account.AccountSaveReqDto;
 import shop.mtcoding.bankapp.dto.account.AccountTransferReqDto;
 import shop.mtcoding.bankapp.dto.account.AccountWithdrawReqDto;
 import shop.mtcoding.bankapp.dto.history.HistoryRespDto;
+import shop.mtcoding.bankapp.dto.search.DetailSearchRespDto;
 import shop.mtcoding.bankapp.handler.ex.CustomException;
 import shop.mtcoding.bankapp.model.account.Account;
 import shop.mtcoding.bankapp.model.account.AccountRepository;
@@ -31,6 +33,7 @@ import shop.mtcoding.bankapp.model.history.HistoryRepository;
 import shop.mtcoding.bankapp.model.user.User;
 import shop.mtcoding.bankapp.paging.Criteria;
 import shop.mtcoding.bankapp.service.AccountService;
+import shop.mtcoding.bankapp.service.HistoryService;
 
 @Controller
 @RequiredArgsConstructor
@@ -48,79 +51,73 @@ public class AccountController {
     @Autowired
     private HistoryRepository historyRepository;
 
+    @Autowired
+    private HistoryService historyService;
+
     @GetMapping("/account/{id}")
     public String detail(@PathVariable int id, @RequestParam(name = "gubun", defaultValue = "all") String gubun) {
 
+        // 1. 인증체크
 
-         // 1. 인증체크
-
-         User principal = (User) session.getAttribute("principal");
-         if (principal == null) {
+        User principal = (User) session.getAttribute("principal");
+        if (principal == null) {
             throw new CustomException("해당 계좌를 볼 수 있는 권한이 없습니다",
-                     HttpStatus.FORBIDDEN);
-         }
-     
-         // 2. 레파지토리 호출 (메서드를 3개 or 마이바티스 동적쿼리)
-         AccountDetailRespDto aDto = accountRepository.findByIdWithUser(id);
-         if (aDto.getUserId() != principal.getId()) {
-             throw new CustomException("해당 계좌를 볼 수 있는 권한이 없습니다",
-                     HttpStatus.FORBIDDEN);
-         }
+                    HttpStatus.FORBIDDEN);
+        }
 
+        // 2. 레파지토리 호출 (메서드를 3개 or 마이바티스 동적쿼리)
+        AccountDetailRespDto aDto = accountRepository.findByIdWithUser(id);
+        if (aDto.getUserId() != principal.getId()) {
+            throw new CustomException("해당 계좌를 볼 수 있는 권한이 없습니다",
+                    HttpStatus.FORBIDDEN);
+        }
 
         return "account/detail";
     }
 
-
-
     @GetMapping("/api/account/{id}")
-    public ResponseEntity<?> detailApi(@PathVariable int id, @RequestParam(name = "gubun", defaultValue = "all") String gubun,
-     @RequestParam(name = "page", defaultValue = "1") Integer page) {
+    public ResponseEntity<?> detailApi(@PathVariable int id,
+            @RequestParam(name = "gubun", defaultValue = "all") String gubun,
+            @RequestParam(name = "page", defaultValue = "1") Integer page) {
 
-     // 1. 인증체크    
-     
-     // 2. 레파지토리 호출 (메서드를 3개 or 마이바티스 동적쿼리)
-     AccountDetailRespDto aDto = accountRepository.findByIdWithUser(id);
-         
-     
-      // 전체 글 개수
-      double historyListCnt = historyRepository.historyListCnt(gubun, id);
-      double lastpage = Math.ceil(historyListCnt/5);
+        AccountDetailRespDto aDto = accountRepository.findByIdWithUser(id);
 
+        // 전체 글 개수
+        double historyListCnt = historyRepository.historyListCnt(gubun, id);
+        double lastpage = Math.ceil(historyListCnt / 5);
 
-      Criteria cri = new Criteria(page);
-      List<HistoryRespDto> hDtoList = historyRepository.findByGubun(gubun, id, cri.getPageStart(), cri.getPerPageNum());    
-      
-      AccountDetailPageRespDto accountDetailPageRespDto = new AccountDetailPageRespDto(hDtoList, aDto, lastpage);
-        
-      System.out.println("lastpage : "+accountDetailPageRespDto.getLastpage());
-      System.out.println("fullname : "+accountDetailPageRespDto.getADto().getFullname());
-      System.out.println("HDtoList : "+accountDetailPageRespDto.getHDtoList().get(id).getReceiver());
+        Criteria cri = new Criteria(page);
+        List<HistoryRespDto> hDtoList = historyRepository.findByGubun(gubun, id, cri.getPageStart(),
+                cri.getPerPageNum());
 
-      return new ResponseEntity<>(new ResponseDto<>(1, "거래내역 불러오기 성공", accountDetailPageRespDto), HttpStatus.OK);
+        AccountDetailPageRespDto accountDetailPageRespDto = new AccountDetailPageRespDto(hDtoList, aDto, lastpage);
+
+        return new ResponseEntity<>(new ResponseDto<>(1, "거래내역 불러오기 성공", accountDetailPageRespDto), HttpStatus.OK);
     }
-
-
-
 
     @GetMapping("/api/account/{id}/next")
     @ResponseBody
-    public List<HistoryRespDto> getNextPage(@PathVariable int id, @RequestParam(name = "gubun", defaultValue = "all") String gubun,
-    Model model, Integer page) {
+    public List<HistoryRespDto> getNextPage(@PathVariable int id,
+            @RequestParam(name = "gubun", defaultValue = "all") String gubun, Integer page) {
 
         Criteria cri = new Criteria(page);
-        List<HistoryRespDto> hDtoList = historyRepository.findByGubun(gubun, id, cri.getPageStart(), cri.getPerPageNum());
+        List<HistoryRespDto> hDtoList = historyRepository.findByGubun(gubun, id, cri.getPageStart(),
+                cri.getPerPageNum());
 
-        
-        model.addAttribute("cri",  cri);
-        model.addAttribute("hDtoList", hDtoList);
-        
-        
         return hDtoList;
     }
 
-  
-
+    @PostMapping("/api/account/{id}/search")
+    public ResponseEntity<?> searchList(@PathVariable int id,
+            @RequestParam(name = "gubun", defaultValue = "all") String gubun,
+            Integer page, @RequestBody DetailSearchRespDto detailSearchRespDto) {
+        Criteria cri = new Criteria(page);
+        List<DetailSearchRespDto> detailList = historyService.거래내역검색(gubun, id, cri.getPageStart(),
+                cri.getPerPageNum(), detailSearchRespDto);
+        System.out.println("test1 : " + detailList.get(id).getReceiver());
+        return new ResponseEntity<>(new ResponseDto<>(1, "검색 성공", detailList),
+                HttpStatus.OK);
+    }
 
     @PostMapping("/account/transfer")
     public String transfer(AccountTransferReqDto accountTransferReqDto) {
